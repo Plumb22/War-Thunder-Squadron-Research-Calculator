@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>War Thunder Squadron Vehicle Research Calculator</title>
+    <!-- Tailwind CSS for styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts: Inter -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        /* Custom styles to complement Tailwind */
+        body {
+            font-family: 'Inter', sans-serif;
+            /* Updated War Thunder background image URL */
+            background-image: url('https://i.imgur.com/GM9qfka.png');
+            background-size: cover;
+            background-position: center;
+            background-attachment: fixed;
+        }
+
+        /* Frosted glass effect for the main container */
+        .glassmorphism-box {
+            background: rgba(17, 24, 39, 0.6); /* Semi-transparent dark background */
+            backdrop-filter: blur(16px) saturate(180%);
+            -webkit-backdrop-filter: blur(16px) saturate(180%);
+            border: 1px solid rgba(255, 255, 255, 0.125);
+        }
+
+        /* Style for the date picker icon in dark mode */
+        input[type="date"] {
+            color-scheme: dark;
+        }
+        
+        /* Custom styling for number input arrows */
+        input[type=number]::-webkit-inner-spin-button,
+        input[type=number]::-webkit-outer-spin-button {
+            -webkit-appearance: none;
+            margin: 0;
+        }
+        input[type=number] {
+            -moz-appearance: textfield;
+        }
+    </style>
+</head>
+<body class="bg-gray-900 text-white flex items-center justify-center min-h-screen p-4">
+
+    <!-- Changed bg-gray-800 to our custom glassmorphism-box class -->
+    <div class="glassmorphism-box p-6 sm:p-8 rounded-2xl shadow-2xl w-full max-w-lg">
+        
+        <!-- Header -->
+        <div class="text-center mb-6">
+            <h1 class="text-2xl sm:text-3xl font-bold text-cyan-400">War Thunder Squadron Vehicle Research Calculator</h1>
+            <p class="text-gray-300 mt-2">Estimate your research completion date.</p>
+        </div>
+
+        <!-- Form for input -->
+        <div class="space-y-4">
+            <div>
+                <label for="totalPoints" class="block text-sm font-medium text-gray-300 mb-1">Total Research Points (RP)</label>
+                <input type="text" inputmode="numeric" id="totalPoints" placeholder="400,000" class="w-full bg-gray-700/50 border border-gray-500/50 text-white rounded-lg p-3 focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 outline-none transition duration-200">
+            </div>
+
+            <div>
+                <label for="researchedPoints" class="block text-sm font-medium text-gray-300 mb-1">Already Researched RP</label>
+                <input type="text" inputmode="numeric" id="researchedPoints" placeholder="0 (or leave blank)" class="w-full bg-gray-700/50 border border-gray-500/50 text-white rounded-lg p-3 focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 outline-none transition duration-200">
+            </div>
+
+            <div>
+                <label for="pointsGained" class="block text-sm font-medium text-gray-300 mb-1">RP Gained per Interval</label>
+                <input type="text" inputmode="numeric" id="pointsGained" placeholder="20,000" class="w-full bg-gray-700/50 border border-gray-500/50 text-white rounded-lg p-3 focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 outline-none transition duration-200">
+            </div>
+
+            <div>
+                <label for="lastGainDate" class="block text-sm font-medium text-gray-300 mb-1">Date of Last RP Gain</label>
+                <input type="date" id="lastGainDate" class="w-full bg-gray-700/50 border border-gray-500/50 text-white rounded-lg p-3 focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 outline-none transition duration-200">
+            </div>
+            
+            <!-- Calculation Button -->
+            <button id="calculateBtn" class="w-full bg-cyan-600 hover:bg-cyan-700 text-white font-bold py-3 px-4 rounded-lg transition duration-300 shadow-lg hover:shadow-cyan-500/50 mt-2">
+                Calculate Time Left
+            </button>
+        </div>
+
+        <!-- Result Display Area -->
+        <div id="result" class="mt-6 text-center bg-gray-900/50 p-6 rounded-xl hidden">
+            <p class="text-lg text-gray-300">Time remaining until completion:</p>
+            <p id="daysLeft" class="text-4xl font-bold text-cyan-400 my-2"></p>
+            <p class="text-gray-400">Estimated Completion Date:</p>
+            <p id="finishDate" class="text-xl font-semibold text-white"></p>
+        </div>
+
+        <!-- Error Message Box -->
+        <div id="error-message" class="mt-4 text-center bg-red-900/50 border border-red-500 p-3 rounded-lg text-red-300 hidden">
+        </div>
+
+    </div>
+
+    <script>
+        // DOM element references
+        const totalPointsInput = document.getElementById('totalPoints');
+        const researchedPointsInput = document.getElementById('researchedPoints');
+        const pointsGainedInput = document.getElementById('pointsGained');
+        const lastGainDateInput = document.getElementById('lastGainDate');
+        const calculateBtn = document.getElementById('calculateBtn');
+        const resultDiv = document.getElementById('result');
+        const daysLeftP = document.getElementById('daysLeft');
+        const finishDateP = document.getElementById('finishDate');
+        const errorMessageDiv = document.getElementById('error-message');
+
+        /**
+         * Formats the number in an input field with thousand separators (commas)
+         * as the user types.
+         * @param {Event} e The input event.
+         */
+        function formatNumberInput(e) {
+            const input = e.target;
+            const selectionStart = input.selectionStart;
+            const originalValue = input.value;
+            const originalLength = originalValue.length;
+
+            const numericValue = originalValue.replace(/[^0-9]/g, '');
+
+            if (numericValue) {
+                const formattedValue = Number(numericValue).toLocaleString('en-US');
+                input.value = formattedValue;
+
+                const newLength = formattedValue.length;
+                const newSelection = selectionStart + (newLength - originalLength);
+                input.setSelectionRange(newSelection, newSelection);
+
+            } else {
+                input.value = '';
+            }
+        }
+        
+        // Add event listeners for auto-formatting
+        totalPointsInput.addEventListener('input', formatNumberInput);
+        researchedPointsInput.addEventListener('input', formatNumberInput);
+        pointsGainedInput.addEventListener('input', formatNumberInput);
+
+        // Event listener for the calculate button
+        calculateBtn.addEventListener('click', () => {
+            resultDiv.classList.add('hidden');
+            errorMessageDiv.classList.add('hidden');
+
+            // 1. Get and parse input values
+            const totalPoints = parseFloat(totalPointsInput.value.replace(/,/g, ''));
+            // If researched points input is empty, treat it as 0
+            const researchedPoints = parseFloat(researchedPointsInput.value.replace(/,/g, '')) || 0;
+            const pointsGained = parseFloat(pointsGainedInput.value.replace(/,/g, ''));
+            const lastGainDateStr = lastGainDateInput.value;
+            const daysInterval = 3; // Hardcoded interval for squadron vehicles
+
+            // 2. Validate inputs
+            if (isNaN(totalPoints) || isNaN(pointsGained)) {
+                showError("Please fill in 'Total RP' and 'RP Gained' fields with valid numbers.");
+                return;
+            }
+             if (!lastGainDateStr) {
+                showError("Please select the date of your last RP gain.");
+                return;
+            }
+            if (totalPoints <= 0 || researchedPoints < 0 || pointsGained <= 0) {
+                showError("All numeric values must be positive. 'Already Researched RP' can be zero.");
+                return;
+            }
+            if (researchedPoints >= totalPoints) {
+                showError("The research is already complete.");
+                return;
+            }
+
+            // 3. Perform the calculation (LOGIC UPDATED HERE)
+            const remainingPoints = totalPoints - researchedPoints;
+            
+            // First, calculate how many intervals are needed. Use Math.ceil to round up.
+            // This ensures that even if only 1 RP is needed, a full interval is counted.
+            const intervalsNeeded = Math.ceil(remainingPoints / pointsGained);
+            
+            // Then, calculate the total days needed based on the number of full intervals.
+            const calendarDaysToAdd = intervalsNeeded * daysInterval;
+
+            // 4. Calculate the finish date from the last gain date
+            // Use T00:00:00 to avoid timezone interpretation issues
+            const lastGainDate = new Date(lastGainDateStr + 'T00:00:00');
+            
+            const finishDate = new Date(lastGainDate);
+            finishDate.setDate(lastGainDate.getDate() + calendarDaysToAdd);
+
+            const formattedFinishDate = finishDate.toLocaleDateString('en-GB', {
+                day: '2-digit',
+                month: '2-digit',
+                year: 'numeric'
+            });
+            
+            // Calculate days left from today for a more intuitive display
+            const today = new Date();
+            today.setHours(0, 0, 0, 0); // Normalize today's date
+            
+            let daysLeftFromToday = 0;
+            if (finishDate > today) {
+                const timeDiff = finishDate.getTime() - today.getTime();
+                daysLeftFromToday = Math.ceil(timeDiff / (1000 * 3600 * 24));
+            }
+
+
+            // 5. Display the results
+            daysLeftP.textContent = `${daysLeftFromToday} days`;
+            finishDateP.textContent = formattedFinishDate;
+            resultDiv.classList.remove('hidden');
+        });
+
+        // Function to display error messages
+        function showError(message) {
+            errorMessageDiv.textContent = message;
+            errorMessageDiv.classList.remove('hidden');
+        }
+    </script>
+</body>
+</html>
